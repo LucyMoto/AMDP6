@@ -1,0 +1,250 @@
+---
+title: "Multiple Linear Regression Model LM"
+author: "Lucy Michaels"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/lucyq/Dropbox/LM/A/AMDP/06 Modelli Statistici di Regressione")
+```
+
+### Introduction
+
+Multiple linear regression is a widely used statistical method for modelling the relationship between a dependent variable and one or more independent variables. In this analysis, we aim to develop a robust and interpretable linear regression model while addressing common challenges such as multicollinearity, overfitting, and variable selection. Key steps include evaluating the significance of predictors using the F-statistic and p-values, assessing multicollinearity through variance inflation factors, and exploring the impact of reducing the number of variables on model performance. Ready? Let's get started.
+
+### Examination of the dataset
+
+Load the dataset on automobiles and assign it to the variable 'dati':
+
+```{r}
+dati <- read.delim("Automobili.mult.txt", head = T, sep = ",")
+```
+
+Let's examine the structure of the dataset:
+
+```{r}
+str(dati)
+```
+
+We have 195 observations of 6 variables: cavalli (horsepower), miglia.per.litro (mpl), lunghezza (length), tempi.del.motore (engine timing), prezzo (price) and carburante (fuel type). The first five variables are quantitative, but the 6th is categorical.
+
+```{r}
+head(dati$Carburante)
+```
+
+As the 6th attribute is categorical, type: character, we use the 'factor' function to change it into factors. Factors store the data as integer codes associated with levels, making it memory efficient and ensures there is an inherent order to the levels, which can be important for analysis or plotting.
+
+```{r}
+dati$Carburante <- factor(dati$Carburante)
+```
+
+Now we re-examine the 6th variable:
+
+```{r}
+head(dati$Carburante)
+str(dati)
+```
+
+We can see the 'Carburante' variable is now a factor with two levels: 'gas' and 'diesel'.
+
+To see an overview of the data, we can use the 'summary' function:
+
+```{r}
+summary(dati)
+```
+
+To see a visual overview of the data, we can plot histograms of each numerical variable, first setting up a 3 by 2 plotting frame using the 'par' function:
+
+```{r}
+par(mfrow = c(3,2)) 
+hist(dati$Cavalli)
+hist(dati$Miglia.per.litro) 
+hist(dati$Lunghezza)
+hist(dati$Tempi.del.motore) 
+hist(dati$Prezzo)
+```
+
+We have positively skewed data for most variables, whilst the lunghezza (length) data appears to be normally distributed. Tempi del motore seems to be slightly negatively skewed.
+
+We can now use the 'pairs' function to plot scatterplots between every pair of variables:
+
+```{r}
+pairs(dati)
+```
+
+We can immediately see that as the 'carburante' category has two levels, 1 and 2 (gas and diesel), it does not make sense to include it. We can rerun the 'pairs' function, but eliminating the 6th column with the command: 'pairs(dati[,-6])'. If we had a lot of columns of data, and we knew we wanted the last one, we could use the 'dim' function to identify the last column:
+
+```{r}
+dim(dati) 
+dim(dati)[2]
+
+pairs(dati[,-dim(dati)[2]])
+```
+
+We can see there is no correlation between engine timing (tempi del motore) and the other variables. There appears to be correlations between the other variables, although the relationship does not always seem linear (prezzo and miglia per litro for example). This non linearity could potentially cause problems but we will press on to explore what happens. We can check the 'r' values between each pair of variables using the 'cor' function:
+
+```{r}
+round(cor(dati[,-6]),2)
+```
+
+The low values in the 'tempi del motore' column confirm the lack of correlation between the 4th variable and the others. All other correlations have magnitude 0.58 or higher.
+
+Before performing our linear regression, we should check the contrast coding for the factor carburante:
+
+```{r}
+contrasts(dati$Carburante )
+```
+
+For the carburante variable, 'gas' is 1 and 'diesel' is 0.
+
+### COMPLETE MULTIPLE LINEAR REGRESSION MODEL: reg.m
+
+Now we fit the linear multiple regression model, defining prezzo (price) as the response and all variables as inputs, taking the data from our prepared dataset. We assign the result to 'reg.m':
+
+```{r}
+reg.m <- lm(Prezzo ~ ., data = dati) 
+summary(reg.m)
+```
+
+The large p-values (p \> 0.05) in the last column of the 'coefficients' section of the summary tell us that 'Miglia.per.litro' and 'tempi.del.motore' do not have statistically significant effects on the model. This indicates that we can better our model by omitting these variables.
+
+### REDUCED MULTIPLE LINEAR REGRESSION MODEL: reg.m2
+
+We could try eliminating one of the variables at a time, or both simultaneously. For speed, we will try the latter. Now we fit the reduced linear multiple regression model, again defining prezzo (price) as the response, but this time eliminating the input variables 'Miglia.per.litro' and 'Tempi.del.motore'. We assign the result to the variable 'reg.m2':
+
+```{r}
+reg.m2 <- lm(dati$Prezzo ~ dati$Cavalli + dati$Lunghezza + dati$Carburante) 
+summary(reg.m2)
+```
+
+All of the p-values are very small, much less than 0.05, implying the reduced model is better than the complete model we originally looked at. We can interpret the values in the 'Estimate' column: an increase of 10 cavalli would increase the price by 1468; an increase of 10cm would increase the price by 1655; changing the carburante from 0 (diesel) to 1 (gas) would decrease the price by 4536.
+
+We should also inspect the adjusted R-squared values:
+
+R-squared reg.m: 0.753
+
+R-squared reg.m2: 0.7529
+
+We have very similar, reasonably high R-squared values, although the reg.m2 model has the advantage of fewer variables. Fewer variables means it is less likely that the variables are correlated, which would make it difficult to determine each variable's individual effect; we avoid overfitting, where the model captures too much noise or random fluctuations; the model is easier to interpret and explain; we improve the computational efficiency, and adhere to Occam's Razor, that is, given competing explanations, the simplest ones should be preferred. In both models, about 75% of the variance is accounted for.
+
+### Is the Reduced Model Better? Hypothesis Testing
+
+H0: The parameters for miglio.per.litro and tempi.del.motore are zero, that is, our reduced model is better.
+
+H1: The parameters for miglio.per.litro and tempi.del.motore are NOT zero, that is, our complete model is better.
+
+We reject H0 if Foss \>= F\_[p+1-k, n-p-1, 1-alpha]
+
+We can use the ANOVA (AN-alysis O-f VA-riance) procedure to test for a statistically significant difference between groups. This will calculate the F-statistic, which is based on the ratio of the variance across group means to the variance due to residual error. The higher this ratio, the more statistically significant the result.
+
+```{r}
+anova.MR <- anova(reg.m2) 
+anova.MR
+
+anova.MC <- anova(reg.m) 
+anova.MC
+```
+
+To calculate the F statistic, we first isolate:
+
+-   the residuals of each of the models;
+
+-   q, the number of variables in the complete model plus one, less the number of parameters in the reduced model;
+
+-   p, the number predictors in the reduced model; and
+
+-   d, the number of observations less the number of predictors in the reduced model less one.
+
+```{r}
+RSS.MR <- anova.MR$`Sum Sq`[4]
+RSS.MC <- anova.MC$`Sum Sq`[6] 
+p <- dim(dati)[2] 
+q <- p+1-4 
+n <- dim(dati)[1] 
+d <- n-p-1
+```
+
+Now we can find F_oss (F osservata / observed) using the statistical test F:
+
+```{r}
+Foss <- ((RSS.MR-RSS.MC)/q)/(RSS.MC/d) 
+round(Foss,2)
+```
+
+Now we find the cut-off level above which we reject the null hypothesis. To find the correct Fisher distribution value, we use the 'df' function, which takes arguments: significance value required (1 - alpha), degrees of freedom q, degrees of freedom d:
+
+```{r}
+f_5 <- qf(0.95, q, d)
+
+Foss >= f_5
+```
+
+Given the FALSE result, we do not reject the null hypothesis. So omitting miglio.al.litro and tempi.del.motore gives us a better model.
+
+### Is the Reduced Model Better? Are the Variables in the Reduced Model Correlated?
+
+We can use the function 'vif', variance inflation factors to detect multicollinearity. The VIF quantifies how much the variance of a regression model is inflated due to multicollinearity. A VIF value of 1 would indicate no correlation between variables, above 1 but up to 5 indicates some multicollinearity, whilst a VIF value above 5 (or above 10, depending on the strictness required) indicates there are problematic levels of correlation between variables.
+
+```{r}
+library(car) 
+vif(reg.m2) 
+vif(reg.m)
+```
+
+In both the reduced model and the complete model, there are no multicollinearity issues, as all of the VIF values are below 5. In the complete model, there is a variable whose variance inflation factor is close to 5, which is close to a problematic value, although still in the 'all clear' zone.
+
+### Confidence Intervals for the Reduced Model Parameters
+
+To identify the confidence intervals for the parameters of our reduced model, we can use the 'confint' function which as a default uses 95%:
+
+```{r}
+confint(reg.m2)
+```
+
+The 95% confidence interval is a range of values that you can be 95% certain contains the true price increase: increasing the vehicle's engine power by 10 cavalli would most likely lead to a price increase from 1270 to 1667.
+
+Increasing the vehicle in length by 10cm would most likely lead to a price increase of anything from 1048 to 2262.
+
+Changing the vehicle's fuel from diesel to gas would most likely reduce its price by anything from 2486 to 6587.
+
+### Checking the Model - Analysis of Residuals
+
+We check the residuals after fitting the model to ensure that the key assumptions (linearity, independence, homoscedasticity (constant variance) and normality of errors) behind the model are met. It also helps us understand how well the model captures the data, identify outliers and leverage values which might be distorting the model and identify predictors which are missing or need to be altered (using a squared variable, rather than a linear variable, for example).
+
+```{r}
+par(mfrow = c(2,2)) 
+plot(reg.m2)
+```
+
+Residuals vs Fitted: Given the trend seen in this graph, it is likely that a better fitting model is not linear but might include some x-squared terms.
+
+Q-Q Residuals: the residuals seem to be normally distributed with the exception of the right-most values, where there are a number of outliers.
+
+Residuals vs Leverage: points with standardised residuals outside the range of [-2, 2] but with low leverage values are vertical outliers (e.g. point 68); points with high leverage outside of the range of [-2, 2] are bad leverage points (e.g. point 122); whilst the point with the highest leverage (the right-most point) has a standardised residual within the [-2, 2] range, hence is a good leverage point.
+
+### Using the Model to Make Predictions
+
+Given a vehicle with cavalli = 200, lunghezza = 199.8, carburante = diesel, what is the expected price?
+
+First we construct a vector 'x0' with four values: intercept, cavalli, lunghezza, and carburante:
+
+```{r}
+x0 <- c(1, 200, 199.8, 0)
+```
+
+Then we multiply the transposed x0 vector by the parameters resulting from the reduced model coefficients:
+
+```{r}
+x0 <- c(1, 200, 199.8, 0) 
+t(x0)%*%reg.m2$coefficients
+```
+
+Using this model, we would expect a vehicle with the above characteristics to have a price of 35750.
+
+### Conclusion
+
+The F-statistic was used to compare the restricted and unrestricted models, while the p-value confirmed that the result was statistically significant. The variance inflation factors indicated no multicollinearity issues. Reducing the number variables did not significantly change the model's adjusted R-squared value, but it reduced the number of variables needed, improving the model's "thriftiness", robustness and interpretability, while reducing risks like overfitting.
+
+This multiple linear regression model is expected to make fairly accurate predictions as long as the input variables remain within their central range and do not extend to extreme or boundary values. To better test the model's performance, new data may be required, or the given data could be split into training and testing sets. To further improve the model, squared variables could be considered.

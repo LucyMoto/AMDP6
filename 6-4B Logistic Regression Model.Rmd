@@ -1,0 +1,251 @@
+---
+title: "Logistic Regression Model"
+author: "Lucy Michaels"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/lucyq/Dropbox/LM/A/AMDP/06 Modelli Statistici di Regressione")
+library(wesanderson)
+
+```
+
+### **Introduction**
+
+In this example, we are going to examine a dataset of part of the passenger list for the Titanic. Our aim is to use the data to fit a model which can predict each passenger's survival/nonsurvival, given their age, sex and class of ticket.
+
+When faced with a categorical response variable, that is, when the outcome is yes/no, success/failure, etc, we need to use logistic regression. This gives us a probability for each passenger which we can interpret as yes (\>0.5) or no (\<=0.5).
+
+In this kind of situation, linear regression would give us probabilities outside [0,1] and poor performance from the model as the linear assumption does not hold. Instead, we assume a logistic relationship between the independent variable(s) and the log-odds of the dependent variable.
+
+### **Examination of the dataset**
+
+Load the 'titanic' dataset and assign it to the variable 'dati':
+
+```{r}
+dati <- read.delim("Titanic.txt", head = T, sep = ",")
+```
+
+We examine the structure of the dataset:
+
+```{r}
+str(dati)
+```
+
+We have 1046 observations of 4 variables: sopravvissuti (survived), a yes/no category, genere (sex), età (age), and classe (class of ticket). The first two and fourth variables are categorical and the third is numerical. We use the 'factor' function to change the categorical variables into factors. Factors store the data as integer codes associated with levels, making it memory efficient and ensures there is an inherent order to the levels, which can be important for analysis or plotting.
+
+```{r}
+dati$Sopravvissuti <- factor(dati$Sopravvissuti)
+dati$Genere <- factor(dati$Genere)
+dati$Classe <- factor(dati$Classe)
+```
+
+Now we re-examine the dataset:
+
+```{r}
+str(dati)
+```
+
+We can see the categorical variables (survival, sex and class) are now factors with two, two and three levels respectively.
+
+To see an overview of the data, we can use the 'summary' function:
+
+```{r}
+summary(dati)
+```
+
+For the categorical variables, we can see the number of datapoints in each category. The passenger ages go from two months old to 80 years old, with the main concentration of ages between 20 and 40. We can plot the histogram using the 'hist' function to get a better feel for this variable:
+
+```{r}
+hist(dati$Eta, col = rainbow(16))
+```
+
+In a 'typical' population, we would expect to see ages spread out according to a normal distribution, however, in our sample, there is a positive skew.
+
+Before performing our logistic regression, we should check the contrast coding for the factor variables:
+
+```{r}
+contrasts(dati$Sopravvissuti)
+contrasts(dati$Genere)
+contrasts(dati$Classe)
+```
+
+### **Fitting a Logistic Regression Model**
+
+We use the 'glm' function, and indicate that our response variable survival/sopravvissuti should be related to the all of the other independent variables. We choose the argument 'family' to be binomial as we have a binary response of yes / no.
+
+```{r}
+glm.titanic <- glm(Sopravvissuti ~ ., data = dati, family = binomial)
+```
+
+We use the function 'summary' to see the output of the logistic model:
+
+```{r}
+summary(glm.titanic)
+```
+
+From the last column of the coefficients, 'Pr', we can see that all of the variables have very low p-values, confirming the statistical significance of the results. From the first column, the more negative the estimate, the less chance there was of survival (bearing in mind that 0 indicates non-survival and 1 survival). We can therefore see that age has a much smaller effect on survival, compared to the other variables. The most influential predictors leading to non-survival were: being male, having a third class ticket, then having a 2nd class ticket.
+
+### **Evaluation of the Model's Predictions**
+
+To evaluate the efficacy of our logarithmic model, we can use the 'predict' function, specifying the type 'response' and assigning the result to 'predictions'.
+
+```{r}
+predictions <- predict(glm.titanic, type = "response") 
+head(predictions)
+```
+
+The 'predictions' vector now contains 1046 probabilities, one for each passenger, estimating their chances of survival, based on the logarithmic model. We consider a probability greater than 0.5 as 'survived' and less than or equal to 0.5 as 'did not survive'. We can examine the histogram of the model's output using the 'hist' function:
+
+```{r}
+hist(predictions, main = "Histogram of Predictions", sub = "Non-survival                                     Survival", col = wes_palette(n=5, name = "Moonrise3"))
+abline(v=0.5, col = "darkred")
+```
+
+As expected, the majority of predictions are less than 0.5, as we know that 619/1046 = 59% of the passengers on our list did not survive. In order to analyse if our predictions match the actual outcomes, we need a 1 x 1046 vector with "yes" or "no" for each passenger, according to the model, which we can then compare with the actual outcomes from the 'survival' attribute in the dataset.
+
+One way is to first construct a variable 'sum.pred' using the 'rep' function to form a 1 x 1046 vector containing "no" for every element in the dataset. Then we assign the value "yes" to every element in 'sum.pred' whose corresponding value in 'predictions' is greater than 0.5.
+
+```{r}
+sum.pred <- rep("no", nrow(dati))
+sum(sum.pred == "no")
+
+sum.pred[predictions > 0.5] <- "yes"
+sum(sum.pred == "no")
+```
+
+Now the number of "no"s has dropped from 1046 to 646. We can construct a confusion matrix to see how well the model classified the data, which compares the 'survived' attribute with our model's predictions, passenger by passenger:
+
+```{r}
+confusion.matrix <- table(dati$Sopravvissuti, sum.pred) 
+confusion.matrix
+```
+
+We can find the passengers which have been classified correctly by the model along the leading diagonal (top left and bottom right):
+
+```{r}
+cat("Percentage passengers classified correctly (original model):  ", 
+    round(100*sum(diag(confusion.matrix))/sum(confusion.matrix),0), 
+    "\nPercentage passengers classified incorrectly  (original model):", 
+    round(100*(confusion.matrix[1,2]+confusion.matrix[2,1])/sum(confusion.matrix),0), 
+    "\n")
+```
+
+This model is accurate 78% of the time.
+
+### **Alternative Method: Splitting Data into Training and Testing Sets**
+
+As an alternative method, as there are a large number of observations in this dataset, it becomes feasible to split the data into a training set, containing 70% of the datapoints and a testing set, containing the remaining 30%. We use the 'nrow' function to work out how many values are in the dataset, and we calculate 70% of the total number of rows.
+
+```{r}
+nrow(dati)*0.70
+```
+
+As the result is decimal, we use 'ceiling' to round up the the next integer and assign the result to 'percent70'.
+
+```{r}
+percent70 <- ceiling(nrow(dati)*0.70)
+```
+
+We are going to fit the new model using just over 70% of the data and test the new model using the remaining 30%. The necessary steps are: - Form a vector with numbers from 1 to 1046 using the 'seq_len' function. 70% of these numbers will be picked randomly using the 'sample' function, forming a vector of 733 numbers which is assigned to 'train_nos'. - Create a logical vector of 1046 values that will be used to split the dataset into training and testing sets. We do this by comparing a vector of numbers from 1 to 1046 with the numbers in the 'train_nos' vector, where 733 numbers from 1 to 1046 were picked randomly. When the numbers match, "TRUE" is returned, and if not, "FALSE" is returned, resulting in a 1 x 1046 logical vector which we assign to the variable 'train'.\
+- Check the number of "TRUE" and "FALSE" values in 'train' using the function 'sum' to count the 'TRUE' values.
+
+```{r}
+train_nos <- sample(seq_len(nrow(dati)), percent70, replace = FALSE, prob = NULL)
+
+train <- seq_len(nrow(dati)) %in% train_nos
+
+cat("Training set size:", sum(train), "\nTesting set size:", sum(!train), "\n")
+```
+
+### **Split Model: Training**
+
+We create a new model, whose output is assigned to 'glm.train', using the `glm` function. The glm arguments are the same as before, except this time we take the subset of datapoints corresponding to the random numbers in our variable `train`.
+
+```{r}
+glm.train <- glm(Sopravvissuti ~ ., data = dati, family = binomial, subset = train)
+summary(glm.train)
+```
+
+Using the 'summary' function, we can see that the parameters differ slightly to those found with the original model, although the most influential predictors leading to non-survival are still: being male, having a third class ticket, then having a 2nd class ticket.
+
+### **Split Model: Testing**
+
+We use the 'predict' function to evaluate the new model. The function generates probabilities for the data rows which are not in the training set (and are therefore in the testing set). The output is assigned to the variable 'glm.test'.
+
+```{r}
+glm.test <- predict(glm.train, dati[!train,], type = "response")
+```
+
+### **Comparing Models** 
+
+Next, we convert this vector of probabilities into a vector of "yes" and "no" values. This allows us to directly compare it with the corresponding labels in the 'survived/sopravvissuti' category from the testing set in the original data.
+
+```{r}
+sum.pred.test <- ifelse(glm.test > 0.5, "yes", "no")
+
+confusion.matrix2 <- table(dati$Sopravvissuti[!train], sum.pred.test)
+confusion.matrix2
+```
+
+We can now calculate the percentages of passengers classified correctly and incorrectly, and compare those with the classification percentages from the original model.
+
+```{r}
+cat("Percentage passengers classified correctly (split model):  ", 
+    round(100*sum(diag(confusion.matrix2))/sum(confusion.matrix2),0), 
+    "\nPercentage passengers classified incorrectly  (split model):", 
+    round(100*(confusion.matrix2[1,2]+confusion.matrix2[2,1])/sum(confusion.matrix2),0), 
+    "\n")
+```
+
+Running the code for the second model may produce varying outcomes: sometimes it yields better results, and other times it produces worse results than the original model, which used the entire dataset for training. For comparison:
+
+```{r}
+cat("Percentage passengers classified correctly (original model):  ", 
+    round(100*sum(diag(confusion.matrix))/sum(confusion.matrix),0), 
+    "\nPercentage passengers classified incorrectly  (original model):", 
+    round(100*(confusion.matrix[1,2]+confusion.matrix[2,1])/sum(confusion.matrix),0), 
+    "\n")
+```
+
+However, we need to be cautious about overfitting, which occurs when a model learns not only the underlying patterns in the training data, but also the noise or random variations. This leads to the model performing exceptionally well on the training data but struggling to generalize to new, unseen data.
+
+### **Overfitting Test**
+
+Overfitting would be evidenced by a 5-10% difference between model outcomes. To prevent overfitting, we can employ additional techniques or incorporate more data to ensure that the training and testing errors remain similar.
+
+In this case, the difference in percentage error was:
+
+```{r}
+difference <- round(100*sum(diag(confusion.matrix))/sum(confusion.matrix) 
+                    - 100*sum(diag(confusion.matrix2))/sum(confusion.matrix2),1)
+cat("Difference in percentage error between models:", 
+    difference, 
+     "\n")
+cat("Overfitting evident?", abs(difference) >= 5)
+```
+
+### **Conclusion**
+
+Our models achieved around 78% accuracy in predicting each passenger's survival or nonsurvival, based on their age, sex and class of ticket. Initially, we used a logistic regression model applied to all 1046 datapoints. For comparison, we then employed a 70:30 training-to-testing data split, which yielded a similar level of accuracy, indicating that overfitting was not a significant concern in the original model. Rerunning the second model may produce variable results, however, due to the randomness of the data sample it uses.
+
+Logistic regression assumes a linear relationship between the independent variables and the log-odds of the dependent variable. To ensure the validity of this assumption, further examination of these relationships is necessary. Additionally, while the survival and non-survival groups were reasonably balanced (59% vs. 41%), imbalanced groups in other scenarios could negatively impact the reliability of the model. Exploring adjustments to the threshold for predicting "yes" (currently set at 0.5) could further refine the model’s precision.
+
+A well-performing logistic regression model requires a sufficient number of datapoints—generally at least 10-15 per predictor per class. When we examine the distribution of datapoints in our sample, some small subsets emerge as potential concerns:
+
+```{r}
+table(dati$Sopravvissuti, dati$Genere)
+table(dati$Sopravvissuti, dati$Classe)
+```
+
+There were only 103 females in 1st class who did not survive, and 96 females overall who did not survive. Filtering females who did not survive and organising them by class, we have:
+
+```{r}
+table(dati$Classe, (dati$Sopravvissuti == "no" & dati$Genere == "female"))
+```
+
+There were only 5 females in first class who did not survive, so this small subset may impact the logistic regression model's reliability, particularly in the split model. A longer passenger list, if available, might give us more datapoints in each subset of each class, enhancing the model's performance.
+
+The current model demonstrates a reasonable level of accuracy, although addressing the limitations in data size and structure could improve its predictive power and ideally push its accuracy above the 80-90% level.

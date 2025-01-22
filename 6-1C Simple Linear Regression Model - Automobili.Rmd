@@ -1,0 +1,309 @@
+---
+title: "Simple Linear Regression Model - Automobili"
+author: "Lucy Michaels"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/lucyq/Dropbox/LM/A/AMDP/06 Modelli Statistici di Regressione")
+library(rsconnect)
+library("RColorBrewer")
+```
+
+### **Loading & Examining a Dataset**
+
+Load the dataset and scan the file for missing values:
+
+```{r}
+Automobili <-read.delim("Automobili.txt", head = T, sep = ",")
+Automobili[which(is.na(Automobili), arr.ind = T)[,1],]
+```
+
+### **Removing Observations With Missing Values**
+
+There are missing values in the 'Cavalli' (horsepower) column and in the 'Prezzo' (price) column. Remove the rows with missing values and reassign the reduced dataset to the variable 'dati':
+
+```{r}
+dati <- Automobili[-which(is.na(Automobili), arr.ind = TRUE)[,1],]
+```
+
+Now rows 10, 45, 46, 130, 131 & 132 have been removed from the dataset, leaving 199 observations, rather than 205.
+
+We observe the structure and a summary of the dataset:
+
+```{r}
+str(dati)
+summary(dati)
+```
+
+Spot outliers: Note that the difference between Q1 and Q3 is 116-70 = 46 for cavalli, whereas the maximum value is well above Q3 + 1.5 x 46 = 116+69 = 185 \< 262 (cavalli max) so it seems as though there is at least one outlier as far as this attribute is concerned.
+
+Similarly, for prezzi, Q3 - Q1 = 16.5K - 7.8K = 8.7K, whereas the maximum value is well above Q3 + 1.5 x 8.7K = 16.5 + 13.1 = 29.6K \< 45.4K (prezzo max). This again seems as though there is at least one outlier for the prezzo attribute.
+
+### **Constructing Boxplots and Histograms**
+
+Let's construct a boxplot of each attribute in the dataset, arranged side-by-side using the 'par' function, so that we can better understand how the data points are distributed:
+
+```{r}
+par(mfrow = c(1,2))
+boxplot(dati$Cavalli, main = "Cavalli / Horsepower")
+boxplot(dati$Prezzo, main = "Prezzo / Price")
+```
+
+There are a few outliers for horsepower and many outliers for price.
+
+It can also be useful to plot a histogram of each attribute, to get a better understand the frequencies in each range of values.
+
+```{r}
+par(mfrow = c(1,2))
+hist(dati$Cavalli, main = "Histogram: Horsepower", xlab = "Cavalli", col=brewer.pal(n=10, name = "Set3"))
+hist(dati$Prezzo, main = "Histogram: Price", xlab = "Prezzo", col=brewer.pal(n=10, name = "Spectral"))
+```
+
+Cavalli: The majority of the data points are concentrated between 60 and 120, although a wider range of 60 to 160 would include most points. Prezzo: The majority of data points are concentrated between 0 to 20K, although a wider range of 0 to 30K would include most points.
+
+### **Finding the Correlation Between Horsepower and Price**
+
+We can also examine the relationship between horsepower and price using a scatterplot:
+
+```{r}
+par(mfrow = c(1,1))
+plot(dati$Cavalli, dati$Prezzo, xlab = "Cavalli", ylab = "Prezzo", pch=20)
+```
+
+There seems to be a positive correlation between the variables. We can use the 'cor' function to find the correlation coefficient:
+
+```{r}
+cor(dati)
+```
+
+There is a strong positive correlation of 0.81 between cavalli and prezzo.
+
+### **Building a Linear Regression Model With Ranges for the Parameters**
+
+In order to build a simple linear regression model, we use the function 'lm'. It takes the two sets of data (output \~ input) between which we want the relationship. [ITA keyboard -\> ENG keyboard shift ù to give tilda '\~'] We assign the output to the variable 'reg.s':
+
+```{r}
+reg.s <- lm(dati$Prezzo ~ dati$Cavalli)
+reg.s
+```
+
+alternatively, use the 'coef' function applied to the 'reg.s' variable, or extract the coefficients only from 'reg.s':
+
+```{r}
+coef(reg.s)
+reg.s$coefficients
+```
+
+This gives us the linear regression line: Prezzo = -4562.2 + 172.2 x Cavalli, which is valid only for the existing data values used to build the model: 48 (min) \< cavalli \< 262 (max). The estimated intercept found can not be interpreted in context as we have no data points at cavalli = 0. The estimated slope can be interpreted: for every increase of 1 in cavalli, the price increases by 172.21.
+
+To explore the other outputs available from the 'lm' function, we use the function 'names':
+
+```{r}
+names(reg.s)
+```
+
+Let's examine the position of our regression line and the mean on the scatterplot:
+
+```{r}
+plot(dati$Cavalli, dati$Prezzo, xlab = "Cavalli", ylab = "Prezzo", pch=20, col="grey")
+abline(reg.s, col="red", lwd=3)
+points(mean(dati$Cavalli), mean(dati$Prezzo), pch = 3, col = "black", lwd=3)
+```
+
+To see the confidence levels of the model's parameters to 90%, 95% and 99%, we can use the function 'confint':
+
+```{r}
+CL90 <- confint(reg.s, level = 0.90)
+CL95 <- confint(reg.s)
+CL99 <- confint(reg.s, level = 0.99)
+```
+
+When 'level' is 0.90, the output says 95%. That is, 1 - alpha/2 = 0.95
+
+Let's look at the upper and lower bounds of each of our parameters to 90% confidence level. We can add the two lines which indicate the limits of the 90% significance level in orange using the 'abline' function:
+
+```{r}
+CL90
+plot(dati$Cavalli, dati$Prezzo, xlab = "Cavalli", ylab = "Prezzo", pch=20, col="grey")
+abline(reg.s, col="red", lwd=3)
+points(mean(dati$Cavalli), mean(dati$Prezzo), pch = 3, col = "black", lwd=3)
+abline(a = CL90[1,1], b = CL90[2,1], col = "darkorange", lwd=2)
+abline(a= CL90[1,2], b= CL90[2,2], col = "darkorange", lwd=2)
+```
+
+Let's add the two lines which indicate the limits of the 95% significance level in gold:
+
+```{r}
+CL95
+plot(dati$Cavalli, dati$Prezzo, xlab = "Cavalli", ylab = "Prezzo", pch=20, col="grey")
+abline(reg.s, col="red", lwd=3)
+points(mean(dati$Cavalli), mean(dati$Prezzo), pch = 3, col = "black", lwd=3)
+abline(a = CL90[1,1], b = CL90[2,1], col = "darkorange", lwd=2)
+abline(a= CL90[1,2], b= CL90[2,2], col = "darkorange", lwd=2)
+abline(a = CL95[1,1], b = CL95[2,1], col = "gold1", lwd=3)
+abline(a = CL95[1,2], b = CL95[2,2], col = "gold1", lwd=3)
+```
+
+Let's add the two lines which indicate the limits of the 99% significance level in green:
+
+```{r}
+CL99
+plot(dati$Cavalli, dati$Prezzo, xlab = "Cavalli", ylab = "Prezzo", pch=20, col="grey")
+abline(reg.s, col="red", lwd=3)
+points(mean(dati$Cavalli), mean(dati$Prezzo), pch = 3, col = "black", lwd=3)
+abline(a = CL90[1,1], b = CL90[2,1], col = "darkorange", lwd=2)
+abline(a= CL90[1,2], b= CL90[2,2], col = "darkorange", lwd=2)
+abline(a = CL95[1,1], b = CL95[2,1], col = "gold1", lwd=3)
+abline(a = CL95[1,2], b = CL95[2,2], col = "gold1", lwd=3)
+abline(a = CL99[1,1], b = CL99[2,1], col = "mediumseagreen", lwd=4)
+abline(a = CL99[1,2], b = CL99[2,2], col = "mediumseagreen", lwd=4)
+legend(45,45000,legend = c("Simple linear regression model", "90% confidence interval", "95% confidence interval", "99% confidence interval","mean value"), col=c("red","darkorange", "gold1", "mediumseagreen","black"), cex = 0.8, lwd=4)
+```
+
+The higher the confidence level, the larger the region between the lines, that is, the more sure we can be that the region contains the line with the actual 'real' parameters.
+
+### **Is the Effect of the Horsepower on the Price Statistically Significant?**
+
+### **Hypothesis Testing**
+
+We can use the output of the 'summary' function to perform a hypothesis test on our model's parameters. 
+
+The null hypothesis is: beta 1 (the slope of the regression line) = 0 (i.e. the horsepower value has no effect on the price), 
+and the alternative hypothesis is: beta 1 is not 0 (i.e. the horsepower value has an effect on the price).
+
+```{r}
+summary(reg.s)
+```
+
+In the coefficients section, can find the standard error, t-value and P-value for each of the parameters. The values in the last column, Pr(\>\|t\|) are the P-values. The P-values indicate the chance of beta 1 (the slope) being 172 (the amount our model estimates) by pure chance. Here we can see an extremely small value, indicating a 2 x 10\^-14 percent chance that beta 1 = 172 by chance, hence we reject the null hypothesis.
+
+Alternatively, we could look at the penultimate column in the coefficients section, t value. The t-value for beta 1 (the slope) is 19.4, hence the region for rejection of the null hypothesis would be 19.4 \>= t_197,0.975. This condition is satisfied, hence we reject the null hypothesis.
+
+### **R-squared**
+
+The proportion of variation in the data that is accounted for in the model is given by r squared. We can see from the summary that 'Multiple R-squared' has a value of 0.657, or we can calculate it directly, by squaring the value of r from the 'cor' function:
+
+```{r}
+cor(dati)[2,1]^2
+```
+
+The adjusted R-square value 0.6552, has been adjusted for the number of predictors in the model (199 in our case). The adjusted r-squared value shows whether adding additional predictors improves the model or not. When we see this value decrease, it means the predictor has improved the model by less than expected. In this case the r-squared and adjusted r-squared values are very close to each other.
+
+### **Identifying Outliers by Plotting Standardised Residuals Against the Leverage**
+
+Analysis of the residuals using the function 'hatvalues(reg.s)' gives, for each observation, the degree of influence on the regression equation, E hat. The total is 2. The function 'rstudent(reg.s)' gives, for each observation, the standardised residual, that is, "the number of standard errors away from the regression line". Let's look at the max and min standardised residuals:
+
+```{r}
+max(rstudent(reg.s))
+min(rstudent(reg.s))
+```
+
+Plotting the standardised residuals against the leverage (hat values), we can be spot outliers. Our x-axis will be leverage, that is, the E hat values, and the y-axis will be our standardised residuals. We will add horizontal lines at -2.5 and +2.5, and a vertical line at 0.06:
+
+```{r}
+plot(hatvalues(reg.s), rstudent(reg.s), xlab = "Leverage", ylab = "Standardised Residuals")
+abline(h = -2.5, col="red", lty = 2)
+abline(h = 2.5, col="red", lty = 2)
+abline(v = 0.06, col = "darkgreen", lty = 2)
+```
+
+Points with standardised residuals outside of [-2.5,2.5] could be considered vertical outliers, that is, with an excessively low / excessively high price for the horsepower that they have. They are likely to destabilise the linear regression line. Instead, points with a high leverage value, yet lie within the [-2.5,2.5] standardised residual range are not far from the regression line, but have a much higher horsepower than the other vehicles on the graph. In this case, the point with the highest leverage has a residual within the [-2.5,2.5] range, but is unlikely to destabilise the linear regression model, as the slope of the regression line would be very similar with or without this point.
+
+To determine the number of vertical outliers,
+
+```{r}
+sum(rstudent(reg.s) > 2.5)
+```
+
+To identify the vertical outliers by index number, and assign the resulting matrix to the variable 'v.out':
+
+```{r}
+v.out <- which(matrix(rstudent(reg.s))< -2.5 | matrix(rstudent(reg.s)) > 2.5)
+v.out
+```
+
+To identify the good leverage points by index number and assign the resulting matrix to the variable 'glp':
+
+```{r}
+glp <- which(matrix(hatvalues(reg.s)) > 0.06)
+glp
+```
+
+We can now identify these points on our plot, using the 'points' function, taking the hatvalues and standardised residuals from our 'v.out' matrix and 'glp' matrix:
+
+```{r}
+plot(hatvalues(reg.s), rstudent(reg.s), xlab = "Leverage", ylab = "Standardised Residuals")
+abline(h = -2.5, col="red", lty = 2)
+abline(h = 2.5, col="red", lty = 2)
+points(hatvalues(reg.s)[v.out], rstudent(reg.s)[v.out], col="red", pch=20)
+text(hatvalues(reg.s)[v.out]+0.002, rstudent(reg.s)[v.out]+0.01, v.out, cex = 0.8) 
+abline(v = 0.06, col = "darkgreen", lty = 2)
+points(hatvalues(reg.s)[glp], rstudent(reg.s)[glp], col="darkgreen", pch=20)
+text(hatvalues(reg.s)[glp]+0.002, rstudent(reg.s)[glp]+0.01, glp, cex = 0.8) 
+```
+
+If we apply the 'plot' function to the output of the linear model, we obtain four plots:
+
+(i) residuals against fitted values,
+
+(ii) standardised residuals against theoretical quantiles (QQ residuals),
+
+(iii) the square root of the standardised residuals against the fitted values (scale-location), and
+
+(iv) the standardised residuals against the leverage (the plot we have already seen above).
+
+```{r}
+par(mfrow = c(2,2))
+plot(reg.s)
+```
+
+(i) Residuals against fitted values: the red line does not show a specific trend differing from linearity, so it seems that it would be reasonable to assume that our linear regression line models the relationship between the horsepower and prices effectively.
+
+(ii) Standardised residuals against theoretical quantiles (QQ residuals): here we can see that the tail ends of the curve veer away from the theoretical line (dotted) so the model seems to work well for the central section of the data and less well at the ends.
+
+(iii) The square root of the standardised residuals against the fitted values (scale-location) : here we see the red line is approximately horizontal, meaning the average magnitude of the standardised residuals does not change much as the expected values increase. The values are spread around above and below the line, but in a limited way, so the magnitudes do not vary much compared to the expected values.
+
+(iv) The standardised residuals against the leverage (the plot we have already seen above) shows the outliers which are affecting the model. This indicates heteroskedasticity; the prediction errors differ for portions of the range. In this case, the regression has left something unaccounted for in high and low ranges of horsepower.
+
+### **Making Predictions**
+
+To predict the 'appropriate' price, based on a horsepower value of 150 cavalli, we can form a matrix of (1, 150) that is, 1, which will be multiplied by beta zero and 150, which will be multiplied by beta 1. We transpose this matrix using the function 't' so that it is 1 x 2, and multiply the transposed matrix by the 2 x 1 matrix of coefficients from the linear model:
+
+```{r}
+x0 <- c(1, 150)
+x0
+t(x0)%*%reg.s$coefficients
+```
+
+So the price, according to our model, should be € 21,270 for a horsepower of 150 cavalli.
+
+### **Summary**
+
+In this analysis, we have:
+
+-   examined our dataset
+
+-   removed observations with missing values
+
+-   used boxplots and histograms to get a better feel for the data and spot outliers
+
+-   examined the correlation between our x-values and our y-values
+
+-   built a linear regression model and identified the ranges of the parameters to specific confidence levels,
+
+-   used statistical measures (p-value, r squared) to decide if the effect of the predictor on the response variable is statistically significant,
+
+-   identified outliers by plotting standardised residuals against the leverage,
+
+-   used plots to assess the validity of the linear regression model,
+
+-   used the model to make estimates.
+
+### **Conclusion**
+
+Our simple linear regression model works quite well for most of the values, allowing us to make reasonably accurate predictions for the price, given the horsepower of a vehicle. However, adjustments could improve the model at the lower tail and particularly at the upper tail. There seems to be another predictor, as well as the horsepower, influencing the price of the vehicle. We could try to improve our model by including multiple predictors, to see if we can identify a more complex yet accurate relationship between the predictor and response variables.
